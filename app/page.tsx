@@ -1,5 +1,6 @@
 'use client';
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import MarketChart from './components/MarketChart';
 import { MarketData } from './services/fireantApi';
@@ -9,24 +10,44 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [fileDataCount, setFileDataCount] = useState<number>(0);
 
+
+  // Lấy lịch sử từ localStorage
+  const getHistory = (): MarketData[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('marketDataHistory');
+      if (!raw) return [];
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  };
+
+  // Lưu lịch sử vào localStorage
+  const saveHistory = (history: MarketData[]) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('marketDataHistory', JSON.stringify(history));
+  };
+
+  // Lấy data mới và lưu vào localStorage
   const fetchData = useCallback(async () => {
     try {
       const response = await fetch('/api/market-data');
       const result = await response.json();
-      
       if (result.success) {
-        setMarketData(result.data);
+        // Lấy lịch sử cũ, thêm data mới vào cuối (nếu khác timestamp)
+        let history = getHistory();
+        const latest = result.latest || result.data?.[result.data.length-1];
+        if (latest && (!history.length || history[history.length-1].timestamp !== latest.timestamp)) {
+          history = [...history, latest];
+        }
+        // Giữ tối đa 1000 điểm
+        if (history.length > 1000) history = history.slice(history.length-1000);
+        saveHistory(history);
+        setMarketData(history);
         setLastUpdate(new Date());
         setError(null);
-        
-        // Fetch file data count
-        const fileResponse = await fetch('/api/data-file');
-        const fileResult = await fileResponse.json();
-        if (fileResult.success) {
-          setFileDataCount(fileResult.count);
-        }
       } else {
         setError(result.error || 'Failed to fetch data');
       }
@@ -43,10 +64,18 @@ export default function Home() {
     try {
       const response = await fetch('/api/market-data', { method: 'POST' });
       const result = await response.json();
-      
       if (result.success) {
-        // Refresh data after update
-        await fetchData();
+        // Lấy lịch sử cũ, thêm data mới vào cuối (nếu khác timestamp)
+        let history = getHistory();
+        const latest = result.latest || result.data;
+        if (latest && (!history.length || history[history.length-1].timestamp !== latest.timestamp)) {
+          history = [...history, latest];
+        }
+        if (history.length > 1000) history = history.slice(history.length-1000);
+        saveHistory(history);
+        setMarketData(history);
+        setLastUpdate(new Date());
+        setError(null);
       } else {
         setError(result.error || 'Failed to update data');
         setLoading(false);
@@ -59,38 +88,25 @@ export default function Home() {
 
   const clearDataFile = async () => {
     if (confirm('Bạn có chắc muốn xóa toàn bộ dữ liệu đã lưu?')) {
-      try {
-        const response = await fetch('/api/data-file', { method: 'DELETE' });
-        const result = await response.json();
-        
-        if (result.success) {
-          setMarketData([]);
-          setFileDataCount(0);
-          alert('Đã xóa dữ liệu thành công');
-        } else {
-          setError(result.error || 'Failed to clear data');
-        }
-      } catch (err) {
-        setError('Network error occurred');
-      }
+      saveHistory([]);
+      setMarketData([]);
+      alert('Đã xóa dữ liệu thành công');
     }
   };
 
-  // Fetch data on component mount
+  // Khi load trang, lấy lịch sử từ localStorage
   useEffect(() => {
+    setMarketData(getHistory());
     fetchData();
   }, [fetchData]);
 
   // Set up interval to fetch data every 10 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      fetch('/api/market-data', { method: 'POST' })
-        .then(() => fetchData())
-        .catch(console.error);
+      forceUpdate();
     }, 10000);
-
     return () => clearInterval(interval);
-  }, [fetchData]);
+  }, [forceUpdate]);
 
   const latestData = marketData[marketData.length - 1];
 
@@ -130,7 +146,7 @@ export default function Home() {
           )}
 
           <div className="flex items-center text-sm text-blue-600">
-            <span>Dữ liệu trong file: {fileDataCount} điểm</span>
+            <span>Dữ liệu đã lưu: {marketData.length} điểm</span>
           </div>
         </div>
 
@@ -176,7 +192,7 @@ export default function Home() {
           <MarketChart data={marketData} />
           <div className="mt-4 text-sm text-gray-500">
             <p>• <b>Dữ liệu:</b> Hiệu số vốn hóa (tăng - giảm) của các mã cổ phiếu trên <b>sàn HSX (HOSE)</b></p>
-            <p>• <b>Cập nhật:</b> Tự động mỗi 10 giây, lưu lịch sử vào file <b>market-data.txt</b></p>
+            <p>• <b>Cập nhật:</b> Tự động mỗi 10 giây, lưu lịch sử vào <b>trình duyệt của bạn (localStorage)</b></p>
             <p>• <b>Trục ngang:</b> Thời gian (HH:mm:ss)</p>
             <p>• <b>Trục dọc:</b> Giá trị hiệu số (tỷ đồng), Chart.js tự động co giãn phù hợp</p>
             <p>• <b>Điểm xanh:</b> Giá trị dương (vốn hóa tăng &gt; giảm)</p>
