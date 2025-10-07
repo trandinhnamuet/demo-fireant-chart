@@ -30,7 +30,7 @@ interface MarketChartProps {
 }
 
 const MarketChart: React.FC<MarketChartProps> = ({ data }) => {
-  // Lọc dữ liệu chỉ lấy 10 giờ gần nhất
+  // Lọc dữ liệu chỉ lấy 10 giờ gần nhất.
   const now = new Date();
   const tenHoursAgo = new Date(now.getTime() - 10 * 60 * 60 * 1000);
   
