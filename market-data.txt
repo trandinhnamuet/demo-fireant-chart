@@ -1,0 +1,5 @@
+{"upCapitalization":5563.5,"downCapitalization":15908.3,"difference":-10344.8,"timestamp":"2025-10-07T09:57:49.096Z"}
+{"upCapitalization":5606.9,"downCapitalization":15915.7,"difference":-10308.8,"timestamp":"2025-10-07T09:57:49.535Z"}
+{"upCapitalization":5617.4,"downCapitalization":15803.5,"difference":-10186.1,"timestamp":"2025-10-07T09:57:52.951Z"}
+{"upCapitalization":5561.7,"downCapitalization":15869.7,"difference":-10308,"timestamp":"2025-10-07T09:58:03.702Z"}
+{"upCapitalization":5530.5,"downCapitalization":15752.6,"difference":-10222.1,"timestamp":"2025-10-07T09:58:04.064Z"}

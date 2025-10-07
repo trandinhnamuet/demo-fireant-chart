@@ -1,103 +1,194 @@
-import Image from "next/image";
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import MarketChart from './components/MarketChart';
+import { MarketData } from './services/fireantApi';
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [marketData, setMarketData] = useState<MarketData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [fileDataCount, setFileDataCount] = useState<number>(0);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const fetchData = useCallback(async () => {
+    try {
+      const response = await fetch('/api/market-data');
+      const result = await response.json();
+      
+      if (result.success) {
+        setMarketData(result.data);
+        setLastUpdate(new Date());
+        setError(null);
+        
+        // Fetch file data count
+        const fileResponse = await fetch('/api/data-file');
+        const fileResult = await fileResponse.json();
+        if (fileResult.success) {
+          setFileDataCount(fileResult.count);
+        }
+      } else {
+        setError(result.error || 'Failed to fetch data');
+      }
+    } catch (err) {
+      setError('Network error occurred');
+      console.error('Fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const forceUpdate = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/market-data', { method: 'POST' });
+      const result = await response.json();
+      
+      if (result.success) {
+        // Refresh data after update
+        await fetchData();
+      } else {
+        setError(result.error || 'Failed to update data');
+        setLoading(false);
+      }
+    } catch (err) {
+      setError('Network error occurred');
+      setLoading(false);
+    }
+  };
+
+  const clearDataFile = async () => {
+    if (confirm('Bạn có chắc muốn xóa toàn bộ dữ liệu đã lưu?')) {
+      try {
+        const response = await fetch('/api/data-file', { method: 'DELETE' });
+        const result = await response.json();
+        
+        if (result.success) {
+          setMarketData([]);
+          setFileDataCount(0);
+          alert('Đã xóa dữ liệu thành công');
+        } else {
+          setError(result.error || 'Failed to clear data');
+        }
+      } catch (err) {
+        setError('Network error occurred');
+      }
+    }
+  };
+
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Set up interval to fetch data every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch('/api/market-data', { method: 'POST' })
+        .then(() => fetchData())
+        .catch(console.error);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  const latestData = marketData[marketData.length - 1];
+
+  return (
+    <main className="container mx-auto p-4">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-4">Biểu đồ Hiệu số Vốn hóa (Sàn HSX/HOSE)</h1>
+        <p className="text-gray-600 mb-4">
+          Dữ liệu: <b>Hiệu số vốn hóa</b> giữa các mã cổ phiếu <b>tăng giá</b> (~5.500 tỷ) và <b>giảm giá</b> (~15.600 tỷ) trên <b>sàn HSX (HOSE)</b>.<br/>
+          Nguồn: Fireant (hoặc mô phỏng sát thực tế HSX nếu API lỗi).<br/>
+          <span className="text-xs text-gray-500">(Vốn hóa = tổng giá trị thị trường của các mã tăng/giảm trên HSX, cập nhật mỗi 10 giây)</span>
+        </p>
+        
+        <div className="flex flex-wrap gap-4 mb-4">
+          <button
+            onClick={forceUpdate}
+            disabled={loading}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            {loading ? 'Đang tải...' : 'Cập nhật ngay'}
+          </button>
+          
+          <button
+            onClick={clearDataFile}
+            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
           >
-            Read our docs
-          </a>
+            Xóa dữ liệu
+          </button>
+
+          {/* Xuống dòng sau button xóa dữ liệu */}
+          <div className="basis-full h-0"></div>
+
+          {lastUpdate && (
+            <div className="flex items-center text-sm text-gray-500">
+              <span>Cập nhật lần cuối: {lastUpdate.toLocaleTimeString('vi-VN')}</span>
+            </div>
+          )}
+
+          <div className="flex items-center text-sm text-blue-600">
+            <span>Dữ liệu trong file: {fileDataCount} điểm</span>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        {latestData && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-green-100 p-4 rounded-lg">
+              <h3 className="font-semibold text-green-800">Vốn hóa mã tăng</h3>
+              <p className="text-2xl font-bold text-green-600">
+                {latestData.upCapitalization.toLocaleString('vi-VN')} tỷ
+              </p>
+            </div>
+            <div className="bg-red-100 p-4 rounded-lg">
+              <h3 className="font-semibold text-red-800">Vốn hóa mã giảm</h3>
+              <p className="text-2xl font-bold text-red-600">
+                {latestData.downCapitalization.toLocaleString('vi-VN')} tỷ
+              </p>
+            </div>
+            <div className={`p-4 rounded-lg ${latestData.difference >= 0 ? 'bg-blue-100' : 'bg-orange-100'}`}>
+              <h3 className={`font-semibold ${latestData.difference >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>
+                Hiệu số
+              </h3>
+              <p className={`text-2xl font-bold ${latestData.difference >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+                {latestData.difference >= 0 ? '+' : ''}{latestData.difference.toLocaleString('vi-VN')} tỷ
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {loading && marketData.length === 0 ? (
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4">Đang tải dữ liệu...</p>
+        </div>
+      ) : marketData.length > 0 ? (
+        <div className="bg-white p-4 rounded-lg shadow-lg">
+          <MarketChart data={marketData} />
+          <div className="mt-4 text-sm text-gray-500">
+            <p>• <b>Dữ liệu:</b> Hiệu số vốn hóa (tăng - giảm) của các mã cổ phiếu trên <b>sàn HSX (HOSE)</b></p>
+            <p>• <b>Cập nhật:</b> Tự động mỗi 10 giây, lưu lịch sử vào file <b>market-data.txt</b></p>
+            <p>• <b>Trục ngang:</b> Thời gian (HH:mm:ss)</p>
+            <p>• <b>Trục dọc:</b> Giá trị hiệu số (tỷ đồng), Chart.js tự động co giãn phù hợp</p>
+            <p>• <b>Điểm xanh:</b> Giá trị dương (vốn hóa tăng &gt; giảm)</p>
+            <p>• <b>Điểm đỏ:</b> Giá trị âm (vốn hóa tăng &lt; giảm)</p>
+            <p>• <b>Vùng tô màu:</b> Xanh cho vùng dương, đỏ cho vùng âm</p>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <p>Không có dữ liệu để hiển thị</p>
+        </div>
+      )}
+    </main>
   );
 }
