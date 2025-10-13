@@ -5,6 +5,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
 import time
+import tempfile
+import json
+import os
+from datetime import datetime, timedelta
 
 url = "https://fireant.vn/dashboard"
 
@@ -15,6 +19,10 @@ options = Options()
 options.add_argument("--headless")
 options.add_argument("--disable-gpu")
 options.add_argument("--window-size=1920,1080")
+
+# Chỉ định thư mục user-data-dir tạm thời để tránh xung đột
+user_data_dir = tempfile.mkdtemp()
+options.add_argument(f"--user-data-dir={user_data_dir}")
 
 driver = webdriver.Chrome(options=options)
 driver.get(url)
@@ -55,8 +63,6 @@ results = dict()
 
 # Danh sách 3 điểm cần lấy
 points = [(-100, 40), (-20, 40), (180, 0)]
-import json
-
 def get_chart_data():
     data = {}
     for x, y in points:
@@ -75,8 +81,7 @@ def get_chart_data():
 
 # Lặp vô hạn, mỗi 10s lấy dữ liệu và ghi ra file chart-jsdata.json
 
-import os
-from datetime import datetime, timedelta
+
 def wait_until_next_valid_time():
     now = datetime.now()
     weekday = now.weekday()  # 0=Monday, 6=Sunday
